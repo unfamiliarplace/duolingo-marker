@@ -1,0 +1,7 @@
+goal::100
+first sunday::1999-12-31
+
+students::3
+a name that should stand as it is::
+a name that should be aliased::Alice
+a name that should be deleted::-
