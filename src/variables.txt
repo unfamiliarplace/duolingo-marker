@@ -1,0 +1,5 @@
+goal::250
+first sunday::2024-02-24
+
+students::1
+Sam::
