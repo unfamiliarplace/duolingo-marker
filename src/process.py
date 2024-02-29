@@ -111,8 +111,8 @@ class DuolingoMarker:
     def parse_files(self: DuolingoMarker) -> None:        
         paths = PATH_INPUT.glob('*.txt')
         for path in paths:
-            # if path.stem.startswith('_'):
-            #     continue
+            if path.stem.startswith('_'):
+                continue
 
             self.parse_file(path)
 
