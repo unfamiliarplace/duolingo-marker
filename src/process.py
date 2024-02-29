@@ -1,15 +1,15 @@
 from __future__ import annotations
 import re
-import datetime as dt
+import datetime as datetime
 from pathlib import Path
 from typing import TextIO
 
-PATH_VARIABLES = Path('src/variables.txt')
-PATH_INPUT = Path('src/input')
-PATH_OUTPUT = Path('src/output')
+PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
+PATH_INPUT = Path(__file__).parent / 'input'
 
 FMT_DT_INPUT = '%b %d, %Y %H h %M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
+FMT_DATE_OUTPUT = '%Y-%m-%d'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
 RE_XP = r'^\+(\d+) xp'
@@ -27,10 +27,10 @@ class Student:
         self.name = name
         self.practices = set()
 
-    def practices_between(self: Student, start: dt.datetime, end: dt.datetime) -> set[Practice]:
+    def practices_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> set[Practice]:
         return set(filter(lambda p: p.is_between(start, end), self.practices))
     
-    def xp_between(self: Student, start: dt.datetime, end: dt.datetime) -> int:
+    def xp_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> int:
         return sum(p.xp for p in self.practices_between(start, end))
 
     def __hash__(self: Student) -> int:
@@ -43,15 +43,15 @@ class Practice:
     student: Student
     desc: str
     xp: int
-    date: dt.datetime
+    date: datetime.datetime
 
-    def __init__(self: Practice, student: Student, desc: str, xp: int, date: dt.datetime) -> None:
+    def __init__(self: Practice, student: Student, desc: str, xp: int, date: datetime.datetime) -> None:
         self.student = student
         self.desc = desc
         self.xp = xp
         self.date = date
 
-    def is_between(self: Practice, start: dt.datetime, end: dt.datetime) -> bool:
+    def is_between(self: Practice, start: datetime.datetime, end: datetime.datetime) -> bool:
         return start <= self.date <= end
 
     def __hash__(self: Practice) -> int:
@@ -63,12 +63,14 @@ class Practice:
 class DuolingoMarker:
     students: dict[str, Student]
     goal: int
-    first_sunday: dt.date
+    first_sunday: datetime.date
+    dates: set[datetime.date]
 
     def __init__(self: DuolingoMarker) -> None:
         self.students = {}
         self.goal: 0
         self.first_sunday = None
+        self.dates = set()
 
     def parse_variables(self: DuolingoMarker):
         with open(PATH_VARIABLES, 'r') as f:
@@ -86,7 +88,7 @@ class DuolingoMarker:
                 
                 elif k == 'first sunday':
                     y, m, d = map(int, v.split('-'))
-                    self.first_sunday = dt.date(y, m, d)
+                    self.first_sunday = datetime.date(y, m, d)
 
                 elif k == 'students':
                     n = int(v)
@@ -108,15 +110,15 @@ class DuolingoMarker:
 
                 i += 1
 
-    def parse_files(self: DuolingoMarker) -> None:        
+    def parse_input_files(self: DuolingoMarker) -> None:        
         paths = PATH_INPUT.glob('*.txt')
         for path in paths:
             if path.stem.startswith('_'):
                 continue
 
-            self.parse_file(path)
+            self.parse_input_file(path)
 
-    def parse_file(self: DuolingoMarker, path: Path) -> None:
+    def parse_input_file(self: DuolingoMarker, path: Path) -> None:
 
         with open(path, 'r') as f:
 
@@ -140,20 +142,79 @@ class DuolingoMarker:
                 elif state == 2:
                     m = re.search(RE_DATE, line)
                     if m:
-                        date = dt.datetime.strptime(m.group(0).capitalize(), FMT_DT_INPUT)
-                        practice = Practice(student, desc, xp, date)
+                        dt = datetime.datetime.strptime(m.group(0).capitalize(), FMT_DT_INPUT)
+
+                        date = datetime.date(dt.year, dt.month, dt.day)
+                        self.dates.add(date)
+
+                        practice = Practice(student, desc, xp, dt)
                         student.practices.add(practice)
                         
                         state = 0
 
-    def create_outputs(self: DuolingoMarker) -> None:
-        for student in self.students.values():
-            print(student)
-            for practice in student.practices:
-                print(practice)
+    def show_weeks(self: DuolingoMarker) -> None:
+        weeks = self.create_weeks()
+        if not weeks:
+            print('No data found')
+            return
 
-    def create_output(self: DuolingoMarker) -> None:
-        pass
+        weeks.reverse()
+
+        for (i, week) in enumerate(weeks):
+            print(week)
+
+            if i < (len(weeks) - 1):
+                choice = input('\nEnter to show another week or Q to quit: ').strip().upper()
+
+                if choice == 'Q':
+                    break
+        
+        print('\nFinished')
+
+    def create_weeks(self: DuolingoMarker) -> None:
+        if not self.dates:
+            return
+        
+        weeks = []
+
+        start = None
+
+        for date in sorted(self.dates):
+
+            # Started week?
+            if start is None:
+                start = date
+                end = None
+
+            # Sunday?
+            if date.strftime('%w') == '0':
+                end = date
+                weeks.append(self.format_week(start, end))
+                start = None
+        
+        # Didn't end on a Sunday?
+        if end is None:
+            end = date
+            weeks.append(self.format_week(start, end))
+
+        return weeks
+
+    def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date) -> None:
+        start_dt = datetime.datetime(start.year, start.month, start.day, 0, 0)
+        end_dt = datetime.datetime(end.year, end.month, end.day, 23, 59)
+
+        s = f'{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
+
+        for stu in sorted(self.students.values(), key=lambda s: s.name):
+            xp = stu.xp_between(start_dt, end_dt)
+
+            name = stu.name.ljust(20)
+            full = str(xp).ljust(4)
+            capt = str(min(self.goal, xp)).ljust(3)
+
+            s += '\n' + ' : '.join([name, full, capt])
+        
+        return s
     
 # Functions
     
@@ -163,31 +224,14 @@ def clean_lines(f: TextIO) -> str:
 def mark() -> None:
     d = DuolingoMarker()
     d.parse_variables()
-    d.parse_files()
-    d.create_outputs()            
-
-# Rewritten up to here
-
-# output = ''
-# for name in sorted(d.student_xps):
-#     j_name = name.ljust(20)
-#     j_full = str(d.student_xps[name]).ljust(4)
-#     j_capt = str(min(d.goal, d.student_xps[name])).ljust(3)
-#     output += ' : '.join([j_name, j_full, j_capt]) + '\n'
-
-# output = '\n' + output[:-1]
-
-# out_file = open(out_filename, 'w')
-# out_file.write(output)
-# out_file.close()
-
-# print(output)
-# input(f'\nSaved to {out_filename}\n\nEnter to quit')
-
-# Run
+    d.parse_input_files()
+    d.show_weeks()
 
 def run() -> None:
     mark()
+    input('\nPress Enter to exit')
+
+# Go
 
 if __name__ == '__main__':
     run()
