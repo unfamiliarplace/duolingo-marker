@@ -9,7 +9,7 @@ PATH_INPUT = Path(__file__).parent / 'input'
 
 FMT_DT_INPUT = '%b %d, %Y %H h %M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
-FMT_DATE_OUTPUT = '%Y-%m-%d'
+FMT_DATE_OUTPUT = '%Y-%m-%d (%A)'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
 RE_XP = r'^\+(\d+) xp'
@@ -208,7 +208,7 @@ class DuolingoMarker:
         for stu in sorted(self.students.values(), key=lambda s: s.name):
             xp = stu.xp_between(start_dt, end_dt)
 
-            name = stu.name.ljust(20)
+            name = stu.name.title().ljust(20)
             full = str(xp).ljust(4)
             capt = str(min(self.goal, xp)).ljust(3)
 
