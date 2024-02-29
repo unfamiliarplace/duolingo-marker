@@ -18,12 +18,10 @@ RE_DATE = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
 # Classes
 
 class Student:
-    alias: str
     name: str
     practices: set[Practice]
 
-    def __init__(self: Student, alias: str, name: str) -> None:
-        self.alias = alias
+    def __init__(self: Student, name: str) -> None:
         self.name = name
         self.practices = set()
 
@@ -34,7 +32,7 @@ class Student:
         return sum(p.xp for p in self.practices_between(start, end))
 
     def __hash__(self: Student) -> int:
-        return hash((self.alias, self.name))
+        return hash(self.name)
 
     def __repr__(self: Student) -> str:
         return self.name
@@ -62,12 +60,14 @@ class Practice:
 
 class DuolingoMarker:
     students: dict[str, Student]
+    aliases: dict[str, Student]
     goal: int
     first_sunday: datetime.date
     dates: set[datetime.date]
 
     def __init__(self: DuolingoMarker) -> None:
         self.students = {}
+        self.aliases = {}
         self.goal: 0
         self.first_sunday = None
         self.dates = set()
@@ -103,8 +103,8 @@ class DuolingoMarker:
                         elif real == '-':
                             continue
 
-                        s = Student(alias, real)
-                        self.students[alias] = s
+                        s = self.students.setdefault(real, Student(real))
+                        self.aliases[alias] = s
                     
                     i += n
 
@@ -130,7 +130,7 @@ class DuolingoMarker:
                     if m:
                         alias = m.group(1).strip()
                         desc = m.group(2).strip()
-                        student = self.students[alias]
+                        student = self.aliases[alias]
                         state = 1
 
                 elif state == 1:
@@ -161,6 +161,7 @@ class DuolingoMarker:
         weeks.reverse()
 
         for (i, week) in enumerate(weeks):
+            print()
             print(week)
 
             if i < (len(weeks) - 1):
