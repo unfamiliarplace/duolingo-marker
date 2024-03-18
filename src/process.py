@@ -222,17 +222,40 @@ class DuolingoMarker:
 def clean_lines(f: TextIO) -> str:
     return map(str.lower, filter(None, map(str.strip, f.readlines())))
 
-def mark() -> None:
+def make_marker() -> DuolingoMarker:
     d = DuolingoMarker()
     d.parse_variables()
     d.parse_input_files()
-    d.show_weeks()
+    return d
 
-def run() -> None:
-    mark()
+def mark_weeks() -> None:
+    d = make_marker()    
+    d.show_weeks()
     input('\nPress Enter to exit')
+
+def pick_student(d: DuolingoMarker) -> Student:
+
+    choices = sorted(d.students)
+    choice_str = ''
+    for (i, name) in enumerate(choices):
+        choice_str += f'{i + 1:>2}: {name}\n'
+        
+    print(f'Students:\n\n{choice_str}')
+    number = int(input('Selection (enter number): '))
+    return choices[number - 1]
+
+def mark_student() -> None:
+    d = make_marker()
+    s = pick_student(d)
+    
+    weeks = d.create_weeks()
+    for (start, end) in weeks:
+        xp = s.xp_between(start, end)
+        print(xp)
+
 
 # Go
 
 if __name__ == '__main__':
-    run()
+    # mark_weeks()
+    mark_student()

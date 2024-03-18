@@ -1,4 +1,8 @@
 *DS_STORE*
+src/variables.txt
+input*
+
+!input/_example.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
