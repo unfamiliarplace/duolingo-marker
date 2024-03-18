@@ -9,7 +9,7 @@ PATH_INPUT = Path(__file__).parent / 'input'
 
 FMT_DT_INPUT = '%b %d, %Y %H h %M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
-FMT_DATE_OUTPUT = '%Y-%m-%d (%A)'
+FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
 RE_XP = r'^\+(\d+) xp'
@@ -162,7 +162,7 @@ class DuolingoMarker:
 
         for (i, week) in enumerate(weeks):
             print()
-            print(week)
+            print(self.format_week(*week))
 
             if i < (len(weeks) - 1):
                 choice = input('\nEnter to show another week or Q to quit: ').strip().upper()
@@ -190,19 +190,19 @@ class DuolingoMarker:
             # Sunday?
             if date.strftime('%w') == '0':
                 end = date
-                weeks.append(self.format_week(start, end))
+                weeks.append((start, end))
                 start = None
         
         # Didn't end on a Sunday?
         if end is None:
             end = date
-            weeks.append(self.format_week(start, end))
+            weeks.append((start, end))
 
         return weeks
 
     def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date) -> None:
-        start_dt = datetime.datetime(start.year, start.month, start.day, 0, 0)
-        end_dt = datetime.datetime(end.year, end.month, end.day, 23, 59)
+        start_dt = date_to_dt(start)
+        end_dt = date_to_dt(end)
 
         s = f'{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
 
@@ -217,24 +217,20 @@ class DuolingoMarker:
         
         return s
     
-# Functions
+# Helpers
+    
+def date_to_dt(date: datetime.date) -> datetime.datetime:
+    return datetime.datetime(date.year, date.month, date.day, 0, 0)
+
+def dt_to_date(dt: datetime.datetime) -> datetime.date:
+    return datetime.date(dt.year, dt.month, dt.day)
     
 def clean_lines(f: TextIO) -> str:
     return map(str.lower, filter(None, map(str.strip, f.readlines())))
 
-def make_marker() -> DuolingoMarker:
-    d = DuolingoMarker()
-    d.parse_variables()
-    d.parse_input_files()
-    return d
-
-def mark_weeks() -> None:
-    d = make_marker()    
-    d.show_weeks()
-    input('\nPress Enter to exit')
+# Operations
 
 def pick_student(d: DuolingoMarker) -> Student:
-
     choices = sorted(d.students)
     choice_str = ''
     for (i, name) in enumerate(choices):
@@ -242,20 +238,38 @@ def pick_student(d: DuolingoMarker) -> Student:
         
     print(f'Students:\n\n{choice_str}')
     number = int(input('Selection (enter number): '))
-    return choices[number - 1]
+    return d.students[choices[number - 1]]
+
+def make_marker() -> DuolingoMarker:
+    d = DuolingoMarker()
+    d.parse_variables()
+    d.parse_input_files()
+    return d
+
+# Programs
+
+def mark_class() -> None:
+    print('Class report')
+    d = make_marker()    
+    d.show_weeks()
+    input('\nPress Enter to exit')
 
 def mark_student() -> None:
+    print('Student report')
     d = make_marker()
     s = pick_student(d)
     
-    weeks = d.create_weeks()
-    for (start, end) in weeks:
-        xp = s.xp_between(start, end)
-        print(xp)
+    print(s)
 
+    weeks = d.create_weeks()
+    weeks.reverse()
+    for (start, end) in weeks:
+        header = f'{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
+        xp = s.xp_between(date_to_dt(start), date_to_dt(end))
+        print(f'{header}: {xp}')
 
 # Go
 
 if __name__ == '__main__':
-    # mark_weeks()
-    mark_student()
+    mark_class()
+    # mark_student()
