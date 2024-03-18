@@ -1,5 +1,9 @@
 goal::100
-first sunday::1999-12-31
+
+bonus weeks:22
+; Sundays of weeks that don't have required XP
+2024-02-04
+2024-03-17
 
 students::3
 a name that should stand as it is::
