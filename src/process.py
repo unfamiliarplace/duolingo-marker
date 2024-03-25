@@ -7,13 +7,15 @@ from typing import TextIO
 PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
 
-FMT_DT_INPUT = '%b %d, %Y %H h %M'
+FMT_DT_INPUT1 = '%b %d, %Y %H h %M'
+FMT_DT_INPUT2 = '%b %d, %Y %I:%M %p'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
 RE_XP = r'^\+(\d+) xp'
-RE_DATE = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
+RE_DATE1 = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
+RE_DATE2 = r'([a-z]+) (\d+), (\d+) (\d+):(\d+) (a\.m\.|p\.m\.)'
 
 # Classes
 
@@ -62,20 +64,20 @@ class DuolingoMarker:
     students: dict[str, Student]
     aliases: dict[str, Student]
     goal: int
-    first_sunday: datetime.date
+    bonus_weeks: set[datetime.date]
     dates: set[datetime.date]
 
     def __init__(self: DuolingoMarker) -> None:
         self.students = {}
         self.aliases = {}
         self.goal: 0
-        self.first_sunday = None
+        self.bonus_weeks = set()
         self.dates = set()
 
     def parse_variables(self: DuolingoMarker):
         with open(PATH_VARIABLES, 'r') as f:
 
-            lines = list(filter(None, map(str.strip, f.readlines())))
+            lines = list(filter(lambda L: L and not L.startswith(';'), map(str.strip, f.readlines())))
             i = 0
 
             while i < len(lines):
@@ -85,10 +87,16 @@ class DuolingoMarker:
                 
                 if k == 'goal':
                     self.goal = int(v)
-                
-                elif k == 'first sunday':
-                    y, m, d = map(int, v.split('-'))
-                    self.first_sunday = datetime.date(y, m, d)
+
+                elif k == 'bonus weeks':
+                    n = int(v)
+                    for j in range(i + 1, n + i + 1):
+                        line = lines[j]
+                        y, m, d = map(int, line.split('-'))
+                        sunday = datetime.date(y, m, d)
+                        self.bonus_weeks.add(sunday)                        
+                    
+                    i += n
 
                 elif k == 'students':
                     n = int(v)
@@ -140,10 +148,18 @@ class DuolingoMarker:
                         state = 2
 
                 elif state == 2:
-                    m = re.search(RE_DATE, line)
-                    if m:
-                        dt = datetime.datetime.strptime(m.group(0).capitalize(), FMT_DT_INPUT)
+                    m1 = re.search(RE_DATE1, line)
+                    m2 = re.search(RE_DATE2, line)
+                    if (m1 or m2):
 
+                        if m1:
+                            m = m1
+                            fmt = FMT_DT_INPUT1
+                        else:
+                            m = m2
+                            fmt = FMT_DT_INPUT2
+                        
+                        dt = datetime.datetime.strptime(m.group(0).capitalize().replace('.', ''), fmt)
                         date = datetime.date(dt.year, dt.month, dt.day)
                         self.dates.add(date)
 
@@ -152,19 +168,23 @@ class DuolingoMarker:
                         
                         state = 0
 
+
     def show_weeks(self: DuolingoMarker) -> None:
-        weeks = self.create_weeks()
+        weeks = self.get_weeks()
         if not weeks:
             print('No data found')
             return
+        
+        numbers = self.get_week_numbers(weeks)
 
-        weeks.reverse()
-
-        for (i, week) in enumerate(weeks):
+        for i in range(1, len(weeks) + 1):
+            week = weeks[-i]
+            number = numbers[-i]
             print()
-            print(self.format_week(*week))
+            print(self.format_week(*week, number))
 
-            if i < (len(weeks) - 1):
+            print(i)
+            if i < len(weeks):
                 choice = input('\nEnter to show another week or Q to quit: ').strip().upper()
 
                 if choice == 'Q':
@@ -172,7 +192,7 @@ class DuolingoMarker:
         
         print('\nFinished')
 
-    def create_weeks(self: DuolingoMarker) -> None:
+    def get_weeks(self: DuolingoMarker) -> list[tuple[datetime.date]]:
         if not self.dates:
             return
         
@@ -199,12 +219,34 @@ class DuolingoMarker:
             weeks.append((start, end))
 
         return weeks
+    
+    def get_week_numbers(self: DuolingoMarker, weeks: list[tuple[datetime.date]]) -> list[str]:
+        n = 1
+        numbers = []
 
-    def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date) -> None:
+        boni = self.bonus_weeks.copy()
+
+        for (start, end) in weeks:
+            for bonus in boni:
+                if start <= bonus <= end:
+                    numbers.append('--')
+                    boni.remove(bonus)
+                    break
+
+            else:
+                numbers.append(f'{n:>2}')
+                n += 1
+        
+        return numbers
+
+    def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date, label: str='') -> None:
         start_dt = date_to_dt(start)
         end_dt = date_to_dt(end)
 
-        s = f'{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
+        if label:
+            label += ' '
+
+        s = f'{label}{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
             xp = stu.xp_between(start_dt, end_dt)
@@ -250,7 +292,7 @@ def make_marker() -> DuolingoMarker:
 
 def mark_class() -> None:
     print('Class report')
-    d = make_marker()    
+    d = make_marker()
     d.show_weeks()
     input('\nPress Enter to exit')
 
@@ -261,10 +303,12 @@ def mark_student() -> None:
     
     print(s)
 
-    weeks = d.create_weeks()
-    weeks.reverse()
-    for (start, end) in weeks:
-        header = f'{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
+    weeks = d.get_weeks()
+    numbers = d.get_week_numbers(weeks)
+
+    for (week, number) in reversed(list(zip(weeks, numbers))):
+        start, end = week
+        header = f'{number} {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
         xp = s.xp_between(date_to_dt(start), date_to_dt(end))
         print(f'{header}: {xp}')
 
