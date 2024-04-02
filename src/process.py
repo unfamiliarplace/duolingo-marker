@@ -3,6 +3,7 @@ import re
 import datetime as datetime
 from pathlib import Path
 from typing import TextIO
+from functools import total_ordering
 
 PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
@@ -10,6 +11,7 @@ PATH_INPUT = Path(__file__).parent / 'input'
 FMT_DT_INPUT1 = '%b %d, %Y %H h %M'
 FMT_DT_INPUT2 = '%b %d, %Y %I:%M %p'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
+FMT_DT_OUTPUT_NICE = '%Y-%m-%d %H:%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
@@ -39,6 +41,7 @@ class Student:
     def __repr__(self: Student) -> str:
         return self.name
 
+@total_ordering
 class Practice:
     student: Student
     desc: str
@@ -58,7 +61,23 @@ class Practice:
         return hash((self.student, self.desc, self.xp, self.date.strftime(FMT_DT_OUTPUT)))
     
     def __repr__(self: Practice) -> str:
-        return f'{self.student} : {self.xp} @ {self.date.strftime(FMT_DT_OUTPUT)}'
+        return f'{self.date.strftime("%a")}, {self.date.strftime(FMT_DT_OUTPUT_NICE)} : {self.xp} ({self.desc})'
+    
+    def format_detailed_report(self: Practice) -> str:
+        return f'{self.date.strftime(FMT_DT_OUTPUT)}'
+
+    
+    def __lt__(self: Practice, other: Practice) -> bool:
+        if not(isinstance(other, Practice)):
+            raise TypeError('Cannot compare Practice to non-Practice')
+        
+        return self.date < other.date
+    
+    def __eq__(self: Practice, other: object) -> bool:
+        if not(isinstance(other, Practice)):
+            return False
+        
+        return self.date == other.date
 
 class DuolingoMarker:
     students: dict[str, Student]
@@ -312,8 +331,19 @@ def mark_student() -> None:
         xp = s.xp_between(date_to_dt(start), date_to_dt(end))
         print(f'{header}: {xp}')
 
+def mark_student_detailed() -> None:
+    print('Detailed student report')
+    d = make_marker()
+    s = pick_student(d)
+    
+    print(s)
+
+    for p in sorted(s.practices, reverse=True):
+        print(p)
+
 # Go
 
 if __name__ == '__main__':
-    mark_class()
+    # mark_class()
     # mark_student()
+    mark_student_detailed()
