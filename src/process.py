@@ -208,7 +208,7 @@ class DuolingoMarker:
             print()
             print(self.format_week(*week, number))
 
-            print(i)
+            # print(i)
             if i < len(weeks):
                 choice = input('\nEnter to show another week or Q to quit: ').strip().upper()
 
