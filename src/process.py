@@ -32,14 +32,14 @@ class Student:
     def practices_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> set[Practice]:
         return set(filter(lambda p: p.is_between(start, end), self.practices))
     
-    def practices_between_dt(self: Student, start: datetime.date, end: datetime.date) -> set[Practice]:
-        return self.practices_between(date_to_dt(start), date_to_dt(end))
+    def practices_between_date(self: Student, start: datetime.date, end: datetime.date) -> set[Practice]:
+        return self.practices_between(date_to_dt(start), date_to_dt(end, end=True))
     
     def xp_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> int:
         return sum(p.xp for p in self.practices_between(start, end))
     
-    def xp_between_dt(self: Student, start: datetime.date, end: datetime.date) -> int:
-        return self.xp_between(date_to_dt(start), date_to_dt(end))
+    def xp_between_date(self: Student, start: datetime.date, end: datetime.date) -> int:
+        return self.xp_between(date_to_dt(start), date_to_dt(end, end=True))
 
     def __hash__(self: Student) -> int:
         return hash(self.name)
@@ -271,7 +271,7 @@ class DuolingoMarker:
         s = f'{label}{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
-            xp = stu.xp_between_dt(start, end)
+            xp = stu.xp_between_date(start, end)
 
             name = stu.name.title().ljust(20)
             full = str(xp).ljust(4)
@@ -283,8 +283,13 @@ class DuolingoMarker:
     
 # Helpers
     
-def date_to_dt(date: datetime.date) -> datetime.datetime:
-    return datetime.datetime(date.year, date.month, date.day, 0, 0)
+def date_to_dt(date: datetime.date, end: bool=False) -> datetime.datetime:
+    if end:
+        h, m = 23, 59
+    else:
+        h, m = 0, 0
+
+    return datetime.datetime(date.year, date.month, date.day, h, m)
 
 def dt_to_date(dt: datetime.datetime) -> datetime.date:
     return datetime.date(dt.year, dt.month, dt.day)
@@ -325,13 +330,15 @@ def mark_student() -> None:
     
     print(s)
 
+    print(sorted(s.practices, reverse=True))
+
     weeks = d.get_weeks()
     numbers = d.get_week_numbers(weeks)
 
     for (week, number) in reversed(list(zip(weeks, numbers))):
         start, end = week
         header = f'{number} {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
-        xp = s.xp_between_dt(start, end)
+        xp = s.xp_between_date(start, end)
         print(f'{header}: {xp}')
 
 def mark_student_detailed() -> None:
@@ -353,10 +360,10 @@ def mark_student_detailed() -> None:
         else:
             label = f'Bonus Week'
 
-        print(f'{label} ({start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}) : {s.xp_between_dt(start, end):>4} XP')
+        print(f'{label} ({start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}) : {s.xp_between_date(start, end):>4} XP')
         print()
 
-        for p in sorted(s.practices_between_dt(start, end), reverse=True):
+        for p in sorted(s.practices_between_date(start, end), reverse=True):
             print(f'\t{p}')
         
         print()
@@ -364,6 +371,6 @@ def mark_student_detailed() -> None:
 # Go
 
 if __name__ == '__main__':
-    # mark_class()
+    mark_class()
     # mark_student()
-    mark_student_detailed()
+    # mark_student_detailed()
