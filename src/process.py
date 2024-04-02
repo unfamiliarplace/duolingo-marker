@@ -7,13 +7,15 @@ from typing import TextIO
 PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
 
-FMT_DT_INPUT = '%b %d, %Y %H h %M'
+FMT_DT_INPUT1 = '%b %d, %Y %H h %M'
+FMT_DT_INPUT2 = '%b %d, %Y %I:%M %p'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 RE_NAME = r'^([-_a-z\(\) ]+) (completed|practiced|tested)'
 RE_XP = r'^\+(\d+) xp'
-RE_DATE = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
+RE_DATE1 = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
+RE_DATE2 = r'([a-z]+) (\d+), (\d+) (\d+):(\d+) (a\.m\.|p\.m\.)'
 
 # Classes
 
@@ -146,10 +148,18 @@ class DuolingoMarker:
                         state = 2
 
                 elif state == 2:
-                    m = re.search(RE_DATE, line)
-                    if m:
-                        dt = datetime.datetime.strptime(m.group(0).capitalize(), FMT_DT_INPUT)
+                    m1 = re.search(RE_DATE1, line)
+                    m2 = re.search(RE_DATE2, line)
+                    if (m1 or m2):
 
+                        if m1:
+                            m = m1
+                            fmt = FMT_DT_INPUT1
+                        else:
+                            m = m2
+                            fmt = FMT_DT_INPUT2
+                        
+                        dt = datetime.datetime.strptime(m.group(0).capitalize().replace('.', ''), fmt)
                         date = datetime.date(dt.year, dt.month, dt.day)
                         self.dates.add(date)
 
@@ -157,6 +167,7 @@ class DuolingoMarker:
                         student.practices.add(practice)
                         
                         state = 0
+
 
     def show_weeks(self: DuolingoMarker) -> None:
         weeks = self.get_weeks()
