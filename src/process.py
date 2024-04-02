@@ -32,8 +32,14 @@ class Student:
     def practices_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> set[Practice]:
         return set(filter(lambda p: p.is_between(start, end), self.practices))
     
+    def practices_between_dt(self: Student, start: datetime.date, end: datetime.date) -> set[Practice]:
+        return self.practices_between(date_to_dt(start), date_to_dt(end))
+    
     def xp_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> int:
         return sum(p.xp for p in self.practices_between(start, end))
+    
+    def xp_between_dt(self: Student, start: datetime.date, end: datetime.date) -> int:
+        return self.xp_between(date_to_dt(start), date_to_dt(end))
 
     def __hash__(self: Student) -> int:
         return hash(self.name)
@@ -259,16 +265,13 @@ class DuolingoMarker:
         return numbers
 
     def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date, label: str='') -> None:
-        start_dt = date_to_dt(start)
-        end_dt = date_to_dt(end)
-
         if label:
             label += ' '
 
         s = f'{label}{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
-            xp = stu.xp_between(start_dt, end_dt)
+            xp = stu.xp_between_dt(start, end)
 
             name = stu.name.title().ljust(20)
             full = str(xp).ljust(4)
@@ -328,7 +331,7 @@ def mark_student() -> None:
     for (week, number) in reversed(list(zip(weeks, numbers))):
         start, end = week
         header = f'{number} {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
-        xp = s.xp_between(date_to_dt(start), date_to_dt(end))
+        xp = s.xp_between_dt(start, end)
         print(f'{header}: {xp}')
 
 def mark_student_detailed() -> None:
@@ -336,10 +339,27 @@ def mark_student_detailed() -> None:
     d = make_marker()
     s = pick_student(d)
     
-    print(s)
+    print(s)  
+    print()
 
-    for p in sorted(s.practices, reverse=True):
-        print(p)
+    weeks = d.get_weeks()
+    numbers = d.get_week_numbers(weeks)
+
+    for (week, number) in reversed(list(zip(weeks, numbers))):      
+        start, end = week
+        
+        if number.strip().isdigit():
+            label = f'Week {number:>2}   '
+        else:
+            label = f'Bonus Week'
+
+        print(f'{label} ({start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}) : {s.xp_between_dt(start, end):>4} XP')
+        print()
+
+        for p in sorted(s.practices_between_dt(start, end), reverse=True):
+            print(f'\t{p}')
+        
+        print()
 
 # Go
 
