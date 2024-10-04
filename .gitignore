@@ -1,10 +1,10 @@
 *DS_STORE*
 src/variables.txt
-input*
+src/input/*
 
-!input/_example.txt
-!input/_example_from_activity.txt
-!input/_example_from_main.csv
+!src/input/_example.txt
+!src/input/_example_from_activity.txt
+!src/input/_example_from_main.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
