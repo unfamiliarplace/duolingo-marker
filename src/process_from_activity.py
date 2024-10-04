@@ -16,6 +16,7 @@ import re
 import datetime
 from pathlib import Path
 from typing import TextIO
+from functools import total_ordering
 
 PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
@@ -23,6 +24,7 @@ PATH_INPUT = Path(__file__).parent / 'input'
 FMT_DT_INPUT1 = '%b %d, %Y %H h %M'
 FMT_DT_INPUT2 = '%b %d, %Y %I:%M %p'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
+FMT_DT_OUTPUT_NICE = '%Y-%m-%d %H:%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 RE_NAME = r'^([-_a-z\(\)\. ]+) (completed|practiced|tested)'
@@ -43,8 +45,14 @@ class Student:
     def practices_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> set[Practice]:
         return set(filter(lambda p: p.is_between(start, end), self.practices))
     
+    def practices_between_date(self: Student, start: datetime.date, end: datetime.date) -> set[Practice]:
+        return self.practices_between(date_to_dt(start), date_to_dt(end, end=True))
+    
     def xp_between(self: Student, start: datetime.datetime, end: datetime.datetime) -> int:
         return sum(p.xp for p in self.practices_between(start, end))
+    
+    def xp_between_date(self: Student, start: datetime.date, end: datetime.date) -> int:
+        return self.xp_between(date_to_dt(start), date_to_dt(end, end=True))
 
     def __hash__(self: Student) -> int:
         return hash(self.name)
@@ -52,6 +60,7 @@ class Student:
     def __repr__(self: Student) -> str:
         return self.name
 
+@total_ordering
 class Practice:
     student: Student
     desc: str
@@ -71,7 +80,23 @@ class Practice:
         return hash((self.student, self.desc, self.xp, self.date.strftime(FMT_DT_OUTPUT)))
     
     def __repr__(self: Practice) -> str:
-        return f'{self.student} : {self.xp} @ {self.date.strftime(FMT_DT_OUTPUT)}'
+        return f'{self.date.strftime("%a")}, {self.date.strftime(FMT_DT_OUTPUT_NICE)} : {self.xp} ({self.desc})'
+    
+    def format_detailed_report(self: Practice) -> str:
+        return f'{self.date.strftime(FMT_DT_OUTPUT)}'
+
+    
+    def __lt__(self: Practice, other: Practice) -> bool:
+        if not(isinstance(other, Practice)):
+            raise TypeError('Cannot compare Practice to non-Practice')
+        
+        return self.date < other.date
+    
+    def __eq__(self: Practice, other: object) -> bool:
+        if not(isinstance(other, Practice)):
+            return False
+        
+        return self.date == other.date
 
 class DuolingoMarker:
     students: dict[str, Student]
@@ -196,6 +221,7 @@ class DuolingoMarker:
             print()
             print(self.format_week(*week, number))
 
+            # print(i)
             if i < len(weeks):
                 choice = input('\nEnter to show another week or Q to quit: ').strip().upper()
 
@@ -252,16 +278,13 @@ class DuolingoMarker:
         return numbers
 
     def format_week(self: DuolingoMarker, start: datetime.date, end: datetime.date, label: str='') -> None:
-        start_dt = date_to_dt(start)
-        end_dt = date_to_dt(end)
-
         if label:
             label += ' '
 
         s = f'{label}{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
-            xp = stu.xp_between(start_dt, end_dt)
+            xp = stu.xp_between_date(start, end)
 
             name = stu.name.title().ljust(20)
             full = str(xp).ljust(4)
@@ -273,8 +296,13 @@ class DuolingoMarker:
     
 # Helpers
     
-def date_to_dt(date: datetime.date) -> datetime.datetime:
-    return datetime.datetime(date.year, date.month, date.day, 0, 0)
+def date_to_dt(date: datetime.date, end: bool=False) -> datetime.datetime:
+    if end:
+        h, m = 23, 59
+    else:
+        h, m = 0, 0
+
+    return datetime.datetime(date.year, date.month, date.day, h, m)
 
 def dt_to_date(dt: datetime.datetime) -> datetime.date:
     return datetime.date(dt.year, dt.month, dt.day)
@@ -315,17 +343,47 @@ def mark_student() -> None:
     
     print(s)
 
+    print(sorted(s.practices, reverse=True))
+
     weeks = d.get_weeks()
     numbers = d.get_week_numbers(weeks)
 
     for (week, number) in reversed(list(zip(weeks, numbers))):
         start, end = week
         header = f'{number} {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
-        xp = s.xp_between(date_to_dt(start), date_to_dt(end))
+        xp = s.xp_between_date(start, end)
         print(f'{header}: {xp}')
+
+def mark_student_detailed() -> None:
+    print('Detailed student report')
+    d = make_marker()
+    s = pick_student(d)
+    
+    print(s)  
+    print()
+
+    weeks = d.get_weeks()
+    numbers = d.get_week_numbers(weeks)
+
+    for (week, number) in reversed(list(zip(weeks, numbers))):      
+        start, end = week
+        
+        if number.strip().isdigit():
+            label = f'Week {number:>2}   '
+        else:
+            label = f'Bonus Week'
+
+        print(f'{label} ({start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}) : {s.xp_between_date(start, end):>4} XP')
+        print()
+
+        for p in sorted(s.practices_between_date(start, end), reverse=True):
+            print(f'\t{p}')
+        
+        print()
 
 # Go
 
 if __name__ == '__main__':
     mark_class()
     # mark_student()
+    # mark_student_detailed()
