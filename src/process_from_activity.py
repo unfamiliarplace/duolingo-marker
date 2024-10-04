@@ -1,24 +1,34 @@
 # =============================================================================
 # 
-# PROCESS FROM MAIN PANEL
+# PROCESS FROM ACTIVITY
 # 
-# Make sure to set the custom date range and to save the exported csv with
-# a start and end date (inclusive) like this: yyyy-mm-dd yyyy-mm-dd.csv
+# This is an outdated version from before October 2024, when I discovered that
+# there was a discrepancy between the data from the main panel and the data
+# from the activity panel. The main panel always has the same or more.
+# Duolingo support, while coy, suggested that the main panel captured more
+# data and was more up-to-date, yet only authentic data. Hence, this version
+# is now "abandoned".
 # 
 # =============================================================================
 
 from __future__ import annotations
-import datetime as datetime
+import re
+import datetime
 from pathlib import Path
 from typing import TextIO
-import csv
 
 PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
 
-FMT_DT_INPUT = '%Y-%m-%d %H-%M'
+FMT_DT_INPUT1 = '%b %d, %Y %H h %M'
+FMT_DT_INPUT2 = '%b %d, %Y %I:%M %p'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
+
+RE_NAME = r'^([-_a-z\(\)\. ]+) (completed|practiced|tested)'
+RE_XP = r'^\+(\d+) xp'
+RE_DATE1 = r'^([a-z]+) (\d+), (\d+) (\d+) h (\d+)'
+RE_DATE2 = r'([a-z]+) (\d+), (\d+) (\d+):(\d+) (a\.m\.|p\.m\.)'
 
 # Classes
 
@@ -122,7 +132,7 @@ class DuolingoMarker:
                 i += 1
 
     def parse_input_files(self: DuolingoMarker) -> None:        
-        paths = PATH_INPUT.glob('*.csv')
+        paths = PATH_INPUT.glob('*.txt')
         for path in paths:
             if path.stem.startswith('_'):
                 continue
@@ -131,28 +141,47 @@ class DuolingoMarker:
 
     def parse_input_file(self: DuolingoMarker, path: Path) -> None:
 
-        ts_start, ts_end = path.stem.split()
-        dt_start = datetime.datetime.strptime(f'{ts_start} 00-00', FMT_DT_INPUT)
-        dt_end = datetime.datetime.strptime(f'{ts_end} 11-59', FMT_DT_INPUT)
+        with open(path, 'r') as f:
 
-        self.dates.add(datetime.date(dt_start.year, dt_start.month, dt_start.day))
-        self.dates.add(datetime.date(dt_end.year, dt_end.month, dt_end.day))
+            state = 0
+            for line in clean_lines(f):
 
-        with open(path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            next(reader)
+                if state == 0:
+                    m = re.search(RE_NAME, line)
+                    if m:
+                        alias = m.group(1).strip()
+                        desc = m.group(2).strip()
+                        student = self.aliases[alias]
+                        state = 1
 
-            for row in reader:
-                alias = row[0]
-                xp = int(row[10])
-                dt = dt_start
-                
-                student = self.aliases[alias.lower()]
-                desc = f'Main panel week summary {ts_start} to {ts_end}'
+                elif state == 1:
+                    m = re.search(RE_XP, line)
+                    if m:
+                        xp = int(m.group(1))
+                        state = 2
 
-                practice = Practice(student, desc, xp, dt)
-                student.practices.add(practice)
- 
+                elif state == 2:
+                    m1 = re.search(RE_DATE1, line)
+                    m2 = re.search(RE_DATE2, line)
+                    if (m1 or m2):
+
+                        if m1:
+                            m = m1
+                            fmt = FMT_DT_INPUT1
+                        else:
+                            m = m2
+                            fmt = FMT_DT_INPUT2
+                        
+                        dt = datetime.datetime.strptime(m.group(0).capitalize().replace('.', ''), fmt)
+                        date = datetime.date(dt.year, dt.month, dt.day)
+                        self.dates.add(date)
+
+                        practice = Practice(student, desc, xp, dt)
+                        student.practices.add(practice)
+                        
+                        state = 0
+
+
     def show_weeks(self: DuolingoMarker) -> None:
         weeks = self.get_weeks()
         if not weeks:
