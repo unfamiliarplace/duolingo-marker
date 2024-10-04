@@ -2,7 +2,9 @@
 src/variables.txt
 input*
 
-!input/_example.txt
+!input_example.txt
+!input/_example_from_activity.txt
+!input/_example_from_main.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
