@@ -1,6 +1,6 @@
 goal::100
 
-bonus weeks:22
+bonus weeks:2
 ; Sundays of weeks that don't have required XP
 2024-02-04
 2024-03-17

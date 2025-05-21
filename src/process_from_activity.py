@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TextIO
 from functools import total_ordering
 
-PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
+PATH_VARIABLES = Path(__file__).parent / 'config/variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
 
 FMT_DT_INPUT1 = '%b %d, %Y %H h %M'

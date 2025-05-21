@@ -1,5 +1,5 @@
 *DS_STORE*
-src/variables.txt
+src/config/variables.txt
 src/input/*
 
 !src/input/_example.txt

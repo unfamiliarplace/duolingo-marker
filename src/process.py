@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TextIO
 import csv
 
-PATH_VARIABLES = Path(__file__).parent / 'variables.txt'
+PATH_VARIABLES = Path(__file__).parent / 'config/variables.txt'
 PATH_INPUT = Path(__file__).parent / 'input'
 
 FMT_DT_INPUT = '%Y-%m-%d %H-%M'
