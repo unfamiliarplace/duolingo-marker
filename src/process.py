@@ -229,7 +229,10 @@ class DuolingoMarker:
         if label:
             label += ' '
 
-        s = f'{label}{start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}\n'
+        s = f'Week {label}: {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
+
+        s += "\n\nName".ljust(22) + ' : ' + "XP   : Counted\n"
+        s += "=" * 37
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
             xp = stu.xp_between(start_dt, end_dt)
