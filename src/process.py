@@ -79,47 +79,31 @@ class DuolingoMarker:
 
     def parse_variables(self: DuolingoMarker):
         with open(PATH_VARIABLES, 'r') as f:
-
             lines = list(filter(lambda L: L and not L.startswith(';'), map(str.strip, f.readlines())))
-            i = 0
 
-            while i < len(lines):
-                line = lines[i]
-
+            for line in lines:
                 k, v = map(str.strip, line.split('::'))
                 
                 if k == 'goal':
                     self.goal = int(v)
 
-                elif k == 'bonus weeks':
-                    n = int(v)
-                    for j in range(i + 1, n + i + 1):
-                        line = lines[j]
-                        y, m, d = map(int, line.split('-'))
-                        sunday = datetime.date(y, m, d)
-                        self.bonus_weeks.add(sunday)                        
-                    
-                    i += n
+                elif k == 'bonus week end':
+                    y, m, d = map(int, v.split('-'))
+                    sunday = datetime.date(y, m, d)
+                    self.bonus_weeks.add(sunday) 
 
-                elif k == 'students':
-                    n = int(v)
-                    for j in range(i + 1, n + i + 1):
-                        line = lines[j]
+                elif k == 'alias':
 
-                        alias, real = map(lambda s: s.strip().lower(), line.split('::'))
+                    alias, real = map(lambda s: s.strip().lower(), v.split('=='))
 
-                        if not real:
-                            real = alias
+                    if not real:
+                        real = alias
 
-                        elif real == '-':
-                            continue
+                    elif real == '-':
+                        continue
 
-                        s = self.students.setdefault(real, Student(real))
-                        self.aliases[alias] = s
-                    
-                    i += n
-
-                i += 1
+                    s = self.students.setdefault(real, Student(real))
+                    self.aliases[alias] = s
 
     def parse_input_files(self: DuolingoMarker) -> None:        
         paths = PATH_INPUT.glob('*.csv')
