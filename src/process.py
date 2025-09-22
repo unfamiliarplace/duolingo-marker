@@ -143,7 +143,9 @@ class DuolingoMarker:
             next(reader)
 
             for row in reader:
-                alias = row[0]
+                # Name, Username, Email, ..., ..., ..., ..., ..., ..., Total XP, ...rest
+
+                alias = row[1]
                 xp = int(row[10])
                 dt = dt_start
                 
