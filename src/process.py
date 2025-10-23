@@ -20,6 +20,8 @@ FMT_DT_INPUT = '%Y-%m-%d %H-%M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
+PLACEHOLDER_SKIP = '-'
+
 # Classes
 
 class Student:
@@ -66,6 +68,7 @@ class Practice:
 class DuolingoMarker:
     students: dict[str, Student]
     aliases: dict[str, Student]
+    skips: set[str]
     goal: int
     bonus_weeks: set[datetime.date]
     dates: set[datetime.date]
@@ -73,6 +76,7 @@ class DuolingoMarker:
     def __init__(self: DuolingoMarker) -> None:
         self.students = {}
         self.aliases = {}
+        self.skips = set()
         self.goal: 0
         self.bonus_weeks = set()
         self.dates = set()
@@ -99,7 +103,8 @@ class DuolingoMarker:
                     if not real:
                         real = alias
 
-                    elif real == '-':
+                    elif real == PLACEHOLDER_SKIP:
+                        self.skips.add(alias)
                         continue
 
                     s = self.students.setdefault(real, Student(real))
@@ -132,6 +137,9 @@ class DuolingoMarker:
                 alias = row[1]
                 xp = int(row[10])
                 dt = dt_start
+
+                if alias in self.skips:
+                    continue
                 
                 student = self.aliases[alias.lower()]
                 desc = f'Main panel week summary {ts_start} to {ts_end}'
