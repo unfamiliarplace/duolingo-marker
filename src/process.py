@@ -247,11 +247,16 @@ class DuolingoMarker:
     def calculate_final_report(self: DuolingoMarker) -> dict[str]:
         report = {
             'totals': {
+                'xp': 0,
+                'weeks': 0,
+            },
+            'averages': {
                 'total xp': 0,
-                'total weeks': 0,
-                'avg weekly xp': 0,
-                'avg 100% weeks': 0,
-                'avg 50% weeks': 0,
+                'weekly xp': 0,
+                '100% weeks': 0,
+                '50% weeks': 0,
+                'xp mark': 0,
+                'consistency mark': 0,
             },
             'students': {}
         }
@@ -259,8 +264,8 @@ class DuolingoMarker:
         weeks = self.get_weeks()
         numbers = self.get_week_numbers(weeks)
 
-        report['totals']['total weeks'] = sum(n is not NUMBER_BONUS for n in numbers)
-        report['totals']['total xp'] = self.goal * report['totals']['total weeks']
+        report['totals']['weeks'] = sum(n is not NUMBER_BONUS for n in numbers)
+        report['totals']['xp'] = self.goal * report['totals']['weeks']
 
         # Convert week dates to dts for practice comparisons...
         # Can't be done earlier because bonus uses dates...
@@ -273,6 +278,10 @@ class DuolingoMarker:
                 xps.append(stu.xp_between(start_d, end_d))
             
             report['students'][stu.name] = self.get_student_stats(stu, xps)
+
+        n = len(self.students)
+        for key in report['averages']:
+            report['averages'][key] = round(sum(s[key] for s in report['students'].values()) / n)
 
         return report
     
@@ -291,6 +300,7 @@ class DuolingoMarker:
 
         # Stats
         d['total xp'] = xp
+        d['weekly xp'] = xp / wk
         d['100% weeks'] = sum(x >= self.goal for x in xps)
         d['50% weeks'] = sum(x >= (self.goal / 2) for x in xps) - d['100% weeks']
 
@@ -300,28 +310,77 @@ class DuolingoMarker:
             MAX_BONUS / 100,
             min(xp / xp_goal, 1) + (max(xp, xp_goal) - xp_goal) / (self.goal * 100)
         )
+        d['xp mark'] = round(100 * d['xp mark'])
 
         # =MIN($B$5 / 100, ( (I4/$F4) + (I5/$F5) ) / 2)
         d['consistency mark'] = min(
             MAX_BONUS / 100,
             (d['100% weeks'] / wk) + ((d['50% weeks'] / wk) / 2)
         )
+        d['consistency mark'] = round(100 * d['consistency mark'])
 
         # Comments
-        d['xp comment'] = ""
-        d['consistency comment'] = ""
+        d['xp comment'] = f"Of the overall goal of {xp_goal} XP, you earned {xp}."
+        d['consistency comment'] = self.format_consistency_comment(wk, d['100% weeks'], d['50% weeks'])
 
         return d
+    
+    def format_consistency_comment(self: DuolingoMarker, n: int, full: int, half: int) -> str:
+        s = ""
+        s += f"Of the overall goal of {n} weeks of practice: "
+
+        if full == 0:
+            s += "You did not earn the full XP goal in any week."
+        elif full == 1:
+            s += "You earned the full XP goal in one of them."
+        elif 1 < full < n:
+            s += f"You earned the full XP goal in {full} of them."
+        else:
+            s += "You earned the full XP goal in all of them."
+        
+        if half == 1:
+            s += "You also earned half the XP goal in one of the weeks."
+        elif 1 < half < n:
+            s += f"You also earned half the XP goal in {half} of the weeks."
+        else:
+            s += "You earned half or more of the XP goal in all of the weeks."
+        
+        if (full + half) > n:
+            s += " (The total is higher than {n} because you also earned XP during weeks when it was not required.)"
+
+        return s
 
     def format_final_report(self: DuolingoMarker) -> str:
         s = ""
 
         report = self.calculate_final_report()
-        print(report)
 
         # Totals
+        totals = report['totals']
+        s += '\nTOTALS\n'
+        s += f"\nXP goal:      {totals['xp']} ({round(totals['xp'] / totals['weeks'])} per week)"
+        s += f"\n# weeks goal: {totals['weeks']}"
 
-        # Students        
+        # Averages
+        averages = report['averages']
+        s += '\n\nAVERAGES\n'
+
+        s += f"\nTotal XP earned:  {averages['total xp']}"
+        s += f"\nWeekly XP earned: {averages['weekly xp']}"
+        s += f"\n100% weeks:       {averages['100% weeks']}"
+        s += f"\n50% weeks:        {averages['50% weeks']}"
+        s += f"\nXP mark:          {averages['xp mark']}%"
+        s += f"\nConsistency mark: {averages['consistency mark']}%"
+
+        # Student XP marks
+        s += "\n\nSTUDENT XP MARKS"
+  
+        for stu in sorted(self.students.values(), key=lambda s: s.name):
+            stats = None
+
+        # Student consistency marks
+        s += "\n\nSTUDENT CONSISTENCY MARKS"
+  
         for stu in sorted(self.students.values(), key=lambda s: s.name):
             stats = None
 
@@ -359,19 +418,19 @@ def make_marker() -> DuolingoMarker:
 # Programs
 
 def do_final_report() -> None:
-    print('Final stats')
+    print('Final report')
     d = make_marker()
     print(d.format_final_report())
     input('\nPress Enter to exit')
 
 def do_weekly_class_report() -> None:
-    print('Class report')
+    print('Weekly class report')
     d = make_marker()
     d.show_weeks()
     input('\nPress Enter to exit')
 
 def do_weekly_student_report() -> None:
-    print('Student report')
+    print('Weekly student report')
     d = make_marker()
     s = pick_student(d)
     
