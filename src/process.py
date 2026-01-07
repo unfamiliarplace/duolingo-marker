@@ -21,6 +21,11 @@ FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
 PLACEHOLDER_SKIP = '-'
+NUMBER_BONUS = '--'
+
+WEIGHT_XP = 1
+WEIGHT_CONSISTENCY = 1
+MAX_BONUS = 120
 
 # Classes
 
@@ -138,7 +143,7 @@ class DuolingoMarker:
                 xp = int(row[10])
                 dt = dt_start
 
-                if alias in self.skips:
+                if alias.lower() in self.skips:
                     continue
                 
                 student = self.aliases[alias.lower()]
@@ -206,7 +211,7 @@ class DuolingoMarker:
         for (start, end) in weeks:
             for bonus in boni:
                 if start <= bonus <= end:
-                    numbers.append('--')
+                    numbers.append(NUMBER_BONUS)
                     boni.remove(bonus)
                     break
 
@@ -237,6 +242,89 @@ class DuolingoMarker:
 
             s += '\n' + ' : '.join([name, full, capt])
         
+        return s
+    
+    def calculate_final_report(self: DuolingoMarker) -> dict[str]:
+        report = {
+            'totals': {
+                'total xp': 0,
+                'total weeks': 0,
+                'avg weekly xp': 0,
+                'avg 100% weeks': 0,
+                'avg 50% weeks': 0,
+            },
+            'students': {}
+        }
+
+        weeks = self.get_weeks()
+        numbers = self.get_week_numbers(weeks)
+
+        report['totals']['total weeks'] = sum(n is not NUMBER_BONUS for n in numbers)
+        report['totals']['total xp'] = self.goal * report['totals']['total weeks']
+
+        # Convert week dates to dts for practice comparisons...
+        # Can't be done earlier because bonus uses dates...
+        # TODO reconcile
+        weeks = list((date_to_dt(s), date_to_dt(e)) for (s, e) in weeks)
+
+        for stu in self.students.values():
+            xps = []
+            for (start_d, end_d) in weeks:
+                xps.append(stu.xp_between(start_d, end_d))
+            
+            report['students'][stu.name] = self.get_student_stats(stu, xps)
+
+        return report
+    
+    def get_student_stats(self: DuolingoMarker, student: Student, xps: list[int]) -> dict[str, int]:
+        """
+        total xp, average xp per week, # of weeks w/ full xp, # of weeks w/ half xp
+        final XP mark, final consistency mark
+        comment
+        """
+        d = {}
+
+        # Bases
+        xp_goal = self.goal * len(xps)
+        xp = sum(xps)
+        wk = len(xps)
+
+        # Stats
+        d['total xp'] = xp
+        d['100% weeks'] = sum(x >= self.goal for x in xps)
+        d['50% weeks'] = sum(x >= (self.goal / 2) for x in xps) - d['100% weeks']
+
+        # Marks
+        # =MIN($B$5 / 100, MIN(I2 / $F$2, 1) + ((MAX(I2, $F$2) - $F$2) / ($B$2 * 100)))
+        d['xp mark'] = min(
+            MAX_BONUS / 100,
+            min(xp / xp_goal, 1) + (max(xp, xp_goal) - xp_goal) / (self.goal * 100)
+        )
+
+        # =MIN($B$5 / 100, ( (I4/$F4) + (I5/$F5) ) / 2)
+        d['consistency mark'] = min(
+            MAX_BONUS / 100,
+            (d['100% weeks'] / wk) + ((d['50% weeks'] / wk) / 2)
+        )
+
+        # Comments
+        d['xp comment'] = ""
+        d['consistency comment'] = ""
+
+        return d
+
+    def format_final_report(self: DuolingoMarker) -> str:
+        s = ""
+
+        report = self.calculate_final_report()
+        print(report)
+
+        # Totals
+
+        # Students        
+        for stu in sorted(self.students.values(), key=lambda s: s.name):
+            stats = None
+
         return s
     
 # Helpers
@@ -270,13 +358,19 @@ def make_marker() -> DuolingoMarker:
 
 # Programs
 
-def mark_class() -> None:
+def do_final_report() -> None:
+    print('Final stats')
+    d = make_marker()
+    print(d.format_final_report())
+    input('\nPress Enter to exit')
+
+def do_weekly_class_report() -> None:
     print('Class report')
     d = make_marker()
     d.show_weeks()
     input('\nPress Enter to exit')
 
-def mark_student() -> None:
+def do_weekly_student_report() -> None:
     print('Student report')
     d = make_marker()
     s = pick_student(d)
@@ -295,5 +389,6 @@ def mark_student() -> None:
 # Go
 
 if __name__ == '__main__':
-    mark_class()
-    # mark_student()
+    # do_weekly_class_report()
+    # do_weekly_student_report()
+    do_final_report()
