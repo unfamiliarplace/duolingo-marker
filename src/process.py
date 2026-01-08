@@ -344,6 +344,10 @@ class DuolingoMarker:
             s += f" (The total is higher than {n} because you also practiced in weeks when it wasn't required.)"
 
         return s
+    
+    def save_final_report(self: DuolingoMarker) -> None:
+        report = self.calculate_final_report()
+        
 
     def format_final_report(self: DuolingoMarker) -> str:
         s = ""
