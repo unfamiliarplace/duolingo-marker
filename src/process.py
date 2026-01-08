@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TextIO
 import csv
 import openpyxl
+from openpyxl.styles import Font, PatternFill
 
 PATH_BASE = Path(__file__).parent
 PATH_CONFIG = PATH_BASE / 'config'
@@ -324,14 +325,14 @@ class DuolingoMarker:
         d['consistency mark'] = round(100 * d['consistency mark'])
 
         # Comments
-        d['xp comment'] = f"Out of a goal of {xp_goal:,} XP, you earned {xp:,}, an average of {d['weekly xp']} per week."
+        d['xp comment'] = f"Out of a goal of {xp_goal:,} XP, you earned {xp:,}. The weekly goal was {self.goal} and you earned an average of {d['weekly xp']} per week."
         d['consistency comment'] = self.format_consistency_comment(wks, d['100% weeks'], d['50% weeks'])
 
         return d
     
     def format_consistency_comment(self: DuolingoMarker, n: int, full: int, half: int) -> str:
         s = ""
-        s += f"There were {n} weeks of required practice."
+        s += f"We did {n} weeks of practice."
 
         also = ""
         if full == 0:
@@ -354,8 +355,12 @@ class DuolingoMarker:
     
     def save_final_report(self: DuolingoMarker) -> None:
         report = self.calculate_final_report()
+
+        # Workbook setup
         wb = openpyxl.load_workbook(PATH_TEMPLATE_FINAL_REPORT)
         ws = wb.active
+        fill_name = PatternFill('solid', fgColor='153d64')
+        font_name = Font(color='ffffff')
 
         # Totals
         totals = report['totals']
@@ -375,7 +380,11 @@ class DuolingoMarker:
         for (i, stu) in enumerate(sorted(self.students.values(), key=lambda s: s.name)):
             data = report['students'][stu.name]
             r = i + 4
+            
             ws[f'A{r}'] = stu.name
+            ws[f'A{r}'].fill = fill_name
+            ws[f'A{r}'].font = font_name
+
             ws[f'B{r}'] = data['total xp']
             ws[f'C{r}'] = data['weekly xp']
             ws[f'D{r}'] = data['100% weeks']
