@@ -428,6 +428,8 @@ def make_marker() -> DuolingoMarker:
 # Programs
 
 def do_final_report() -> None:
+    # TODO To be honest I'd rather output this to a spreadsheet
+
     print('Final report')
     d = make_marker()
     print(d.format_final_report())
@@ -455,9 +457,18 @@ def do_weekly_student_report() -> None:
         xp = s.xp_between(date_to_dt(start), date_to_dt(end))
         print(f'{header}: {xp}')
 
+def run():
+    choice = input("Enter for weekly report, 1 for student report, 2 for final report: ").strip()
+
+    match choice:
+        case "":
+            do_weekly_class_report()
+        case "1":
+            do_weekly_student_report()
+        case "2":
+            do_final_report()
+
 # Go
 
 if __name__ == '__main__':
-    # do_weekly_class_report()
-    # do_weekly_student_report()
-    do_final_report()
+    run()
