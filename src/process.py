@@ -277,7 +277,7 @@ class DuolingoMarker:
             for (start_d, end_d) in weeks:
                 xps.append(stu.xp_between(start_d, end_d))
             
-            report['students'][stu.name] = self.get_student_stats(stu, xps)
+            report['students'][stu.name] = self.get_student_stats(report['totals']['weeks'], xps)
 
         n = len(self.students)
         for key in report['averages']:
@@ -285,22 +285,19 @@ class DuolingoMarker:
 
         return report
     
-    def get_student_stats(self: DuolingoMarker, student: Student, xps: list[int]) -> dict[str, int]:
+    def get_student_stats(self: DuolingoMarker, wks: int, xps: list[int]) -> dict[str, int]:
         """
-        total xp, average xp per week, # of weeks w/ full xp, # of weeks w/ half xp
-        final XP mark, final consistency mark
-        comment
+        wks is the number of non-bonus weeks, which may differ from the length of the xp list.
         """
         d = {}
 
         # Bases
-        xp_goal = self.goal * len(xps)
+        xp_goal = self.goal * wks
         xp = sum(xps)
-        wk = len(xps)
 
         # Stats
         d['total xp'] = xp
-        d['weekly xp'] = xp / wk
+        d['weekly xp'] = xp / wks
         d['100% weeks'] = sum(x >= self.goal for x in xps)
         d['50% weeks'] = sum(x >= (self.goal / 2) for x in xps) - d['100% weeks']
 
@@ -315,38 +312,36 @@ class DuolingoMarker:
         # =MIN($B$5 / 100, ( (I4/$F4) + (I5/$F5) ) / 2)
         d['consistency mark'] = min(
             MAX_BONUS / 100,
-            (d['100% weeks'] / wk) + ((d['50% weeks'] / wk) / 2)
+            (d['100% weeks'] / wks) + ((d['50% weeks'] / wks) / 2)
         )
         d['consistency mark'] = round(100 * d['consistency mark'])
 
         # Comments
-        d['xp comment'] = f"Of the overall goal of {xp_goal} XP, you earned {xp}."
-        d['consistency comment'] = self.format_consistency_comment(wk, d['100% weeks'], d['50% weeks'])
+        d['xp comment'] = f"Out of a goal of {xp_goal:,} XP, you earned {xp:,}."
+        d['consistency comment'] = self.format_consistency_comment(wks, d['100% weeks'], d['50% weeks'])
 
         return d
     
     def format_consistency_comment(self: DuolingoMarker, n: int, full: int, half: int) -> str:
         s = ""
-        s += f"Of the overall goal of {n} weeks of practice: "
+        s += f"There were {n} weeks of required practice."
 
+        also = ""
         if full == 0:
-            s += "You did not earn the full XP goal in any week."
+            s += " You did not earn the full XP goal in any week."
         elif full == 1:
-            s += "You earned the full XP goal in one of them."
-        elif 1 < full < n:
-            s += f"You earned the full XP goal in {full} of them."
+            s += f" You earned the full XP goal in 1 week."            
         else:
-            s += "You earned the full XP goal in all of them."
+            s += f" You earned the full XP goal in {full} weeks."
+            also = "also "
         
         if half == 1:
-            s += "You also earned half the XP goal in one of the weeks."
-        elif 1 < half < n:
-            s += f"You also earned half the XP goal in {half} of the weeks."
-        else:
-            s += "You earned half or more of the XP goal in all of the weeks."
-        
+            s += f" You {also}earned at least half the XP goal in 1 week."
+        elif half > 1:
+            s += f" You {also}earned at least half the XP goal in {half} weeks."
+
         if (full + half) > n:
-            s += " (The total is higher than {n} because you also earned XP during weeks when it was not required.)"
+            s += f" (The total is higher than {n} because you also practiced in weeks when it wasn't required.)"
 
         return s
 
@@ -354,6 +349,7 @@ class DuolingoMarker:
         s = ""
 
         report = self.calculate_final_report()
+        name_fill = len(max(self.students, key=len))
 
         # Totals
         totals = report['totals']
@@ -372,17 +368,31 @@ class DuolingoMarker:
         s += f"\nXP mark:          {averages['xp mark']}%"
         s += f"\nConsistency mark: {averages['consistency mark']}%"
 
-        # Student XP marks
+        # Students
+
         s += "\n\nSTUDENT XP MARKS"
   
         for stu in sorted(self.students.values(), key=lambda s: s.name):
-            stats = None
+            data = report["students"][stu.name]
+            s += f'\n{stu.name.ljust(name_fill)}\t{data["xp mark"]:>3}'
+        
+        s += "\n\nSTUDENT XP COMMENTS"
+  
+        for stu in sorted(self.students.values(), key=lambda s: s.name):
+            data = report["students"][stu.name]
+            s += f'\n\n{stu.name}\n{data["xp comment"]}'
 
-        # Student consistency marks
         s += "\n\nSTUDENT CONSISTENCY MARKS"
   
         for stu in sorted(self.students.values(), key=lambda s: s.name):
-            stats = None
+            data = report["students"][stu.name]
+            s += f'\n{stu.name.ljust(name_fill)}\t{data["consistency mark"]:>3}'
+        
+        s += "\n\nSTUDENT CONSISTENCY COMMENTS"
+  
+        for stu in sorted(self.students.values(), key=lambda s: s.name):
+            data = report["students"][stu.name]
+            s += f'\n\n{stu.name}\n{data["consistency comment"]}'
 
         return s
     
