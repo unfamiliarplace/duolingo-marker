@@ -1,13 +1,16 @@
 *DS_STORE*
-src/config/variables.txt
+
+src/config/*
 src/input/*
 src/output/*
+
+!src/config/_variables_example.txt
 
 !src/input/_example.txt
 !src/input/_example_from_activity.txt
 !src/input/_example_from_main.csv
 
-!src/output/readme.md
+!src/output/_readme.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
