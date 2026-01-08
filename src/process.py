@@ -12,9 +12,16 @@ import datetime as datetime
 from pathlib import Path
 from typing import TextIO
 import csv
+import openpyxl
 
-PATH_VARIABLES = Path(__file__).parent / 'config/variables.txt'
-PATH_INPUT = Path(__file__).parent / 'input'
+PATH_BASE = Path(__file__).parent
+PATH_CONFIG = PATH_BASE / 'config'
+PATH_INPUT = PATH_BASE / 'input'
+PATH_OUTPUT = PATH_BASE / 'output'
+PATH_TEMPLATES = PATH_BASE / 'templates'
+
+PATH_VARIABLES = PATH_CONFIG / 'variables.txt'
+PATH_TEMPLATE_FINAL_REPORT = PATH_TEMPLATES / 'final_report.xlsx'
 
 FMT_DT_INPUT = '%Y-%m-%d %H-%M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
@@ -297,7 +304,7 @@ class DuolingoMarker:
 
         # Stats
         d['total xp'] = xp
-        d['weekly xp'] = xp / wks
+        d['weekly xp'] = round(xp / wks)
         d['100% weeks'] = sum(x >= self.goal for x in xps)
         d['50% weeks'] = sum(x >= (self.goal / 2) for x in xps) - d['100% weeks']
 
@@ -317,7 +324,7 @@ class DuolingoMarker:
         d['consistency mark'] = round(100 * d['consistency mark'])
 
         # Comments
-        d['xp comment'] = f"Out of a goal of {xp_goal:,} XP, you earned {xp:,}."
+        d['xp comment'] = f"Out of a goal of {xp_goal:,} XP, you earned {xp:,}, an average of {d['weekly xp']} per week."
         d['consistency comment'] = self.format_consistency_comment(wks, d['100% weeks'], d['50% weeks'])
 
         return d
@@ -347,7 +354,43 @@ class DuolingoMarker:
     
     def save_final_report(self: DuolingoMarker) -> None:
         report = self.calculate_final_report()
-        
+        wb = openpyxl.load_workbook(PATH_TEMPLATE_FINAL_REPORT)
+        ws = wb.active
+
+        # Totals
+        totals = report['totals']
+        ws['B2'] = totals['xp']
+        ws['D2'] = totals['weeks']
+
+        # Averages
+        avgs = report['averages']
+        ws['B3'] = avgs['total xp']
+        ws['C3'] = avgs['weekly xp']
+        ws['D3'] = avgs['100% weeks']
+        ws['E3'] = avgs['50% weeks']
+        ws['F3'] = avgs['xp mark']
+        ws['H3'] = avgs['consistency mark']
+
+        # Students
+        for (i, stu) in enumerate(sorted(self.students.values(), key=lambda s: s.name)):
+            data = report['students'][stu.name]
+            r = i + 4
+            ws[f'A{r}'] = stu.name
+            ws[f'B{r}'] = data['total xp']
+            ws[f'C{r}'] = data['weekly xp']
+            ws[f'D{r}'] = data['100% weeks']
+            ws[f'E{r}'] = data['50% weeks']
+            ws[f'F{r}'] = data['xp mark']
+            ws[f'G{r}'] = data['xp comment']
+            ws[f'H{r}'] = data['consistency mark']
+            ws[f'I{r}'] = data['consistency comment']
+
+        try:
+            wb.save(PATH_OUTPUT / 'final_report.xlsx')
+            print(f'Saved report to {PATH_OUTPUT / "final_report.xlsx"}')
+        except Exception as e:
+            print('Could not save report')
+            print(e)
 
     def format_final_report(self: DuolingoMarker) -> str:
         s = ""
@@ -436,7 +479,8 @@ def do_final_report() -> None:
 
     print('Final report')
     d = make_marker()
-    print(d.format_final_report())
+    d.save_final_report()
+    # print(d.format_final_report())
     input('\nPress Enter to exit')
 
 def do_weekly_class_report() -> None:
@@ -464,13 +508,12 @@ def do_weekly_student_report() -> None:
 def run():
     choice = input("Enter for weekly report, 1 for student report, 2 for final report: ").strip()
 
-    match choice:
-        case "":
-            do_weekly_class_report()
-        case "1":
-            do_weekly_student_report()
-        case "2":
-            do_final_report()
+    if choice == "":
+        do_weekly_class_report()
+    elif choice == "1":
+        do_weekly_student_report()
+    elif choice == "2":
+        do_final_report()
 
 # Go
 
