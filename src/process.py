@@ -515,7 +515,7 @@ def do_weekly_student_report() -> None:
         print(f'{header}: {xp}')
 
 def run():
-    choice = input("Enter for weekly report, 1 for student report, 2 for final report: ").strip()
+    choice = input("Hit Enter for weekly report, or 1 for student report, or 2 for final report: ").strip()
 
     if choice == "":
         do_weekly_class_report()
