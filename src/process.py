@@ -28,12 +28,16 @@ FMT_DT_INPUT = '%Y-%m-%d %H-%M'
 FMT_DT_OUTPUT = '%Y-%m-%d %H-%M'
 FMT_DATE_OUTPUT = '%Y-%m-%d (%a)'
 
-PLACEHOLDER_SKIP = '-'
+CHARACTER_COMMENT = ';'
+CHARACTER_SKIP = '-'
 NUMBER_BONUS = '--'
 
 WEIGHT_XP = 1
 WEIGHT_CONSISTENCY = 1
 MAX_BONUS = 120
+
+DEFAULT_GOAL = 250
+DEFAULT_WEEK_START_DAY = 0 # 0 = Sunday
 
 # Classes
 
@@ -83,6 +87,7 @@ class DuolingoMarker:
     aliases: dict[str, Student]
     skips: set[str]
     goal: int
+    week_start_day: int
     bonus_weeks: set[datetime.date]
     dates: set[datetime.date]
 
@@ -90,33 +95,46 @@ class DuolingoMarker:
         self.students = {}
         self.aliases = {}
         self.skips = set()
-        self.goal: 0
+        self.goal = DEFAULT_GOAL
+        self.week_start_day = DEFAULT_WEEK_START_DAY
         self.bonus_weeks = set()
         self.dates = set()
 
     def parse_variables(self: DuolingoMarker):
         with open(PATH_VARIABLES, 'r') as f:
-            lines = list(filter(lambda L: L and not L.startswith(';'), map(str.strip, f.readlines())))
+            lines = list(filter(lambda L: L and not L.startswith(CHARACTER_COMMENT), map(str.strip, f.readlines())))
 
             for line in lines:
-                k, v = map(str.strip, line.split('::'))
+
+                # Mid-line comments. TODO There is no doubt a cleaner way
+                if CHARACTER_COMMENT in line:
+                    line = line[:line.find(CHARACTER_COMMENT)].strip()
+
+                k, v = (s.strip() for s in line.split('::'))
                 
                 if k == 'goal':
                     self.goal = int(v)
 
-                elif k == 'bonus week end':
+                elif k == 'week start day':
+                    self.week_start_day = int(v)
+
+                elif k == 'bonus week start':
                     y, m, d = map(int, v.split('-'))
-                    sunday = datetime.date(y, m, d)
-                    self.bonus_weeks.add(sunday) 
+                    day = datetime.date(y, m, d)
+                    self.bonus_weeks.add(day) 
 
-                elif k == 'alias':
+                elif k == 'student':
 
-                    alias, real = map(lambda s: s.strip().lower(), v.split('=='))
+                    # Silly hack to ensure split works
+                    if v.count('==') == 0:
+                        v += '=='
+
+                    alias, real = (s.strip().lower() for s in v.split('=='))
 
                     if not real:
                         real = alias
 
-                    elif real == PLACEHOLDER_SKIP:
+                    elif real == CHARACTER_SKIP:
                         self.skips.add(alias)
                         continue
 
@@ -154,11 +172,21 @@ class DuolingoMarker:
                 if alias.lower() in self.skips:
                     continue
                 
-                student = self.aliases[alias.lower()]
-                desc = f'Main panel week summary {ts_start} to {ts_end}'
+                try:
+                    student = self.aliases[alias.lower()]                    
+                    desc = f'Main panel week summary {ts_start} to {ts_end}'
 
-                practice = Practice(student, desc, xp, dt)
-                student.practices.add(practice)
+                    practice = Practice(student, desc, xp, dt)
+                    student.practices.add(practice)
+
+                except KeyError:
+                    print()
+                    print(f'Unregistered username, probably an uncredited student: {alias}')
+                    print('If this username should not be credited, skip it by adding this line to your variables file:')
+                    print(f'student::{alias}=={CHARACTER_SKIP}')
+                    print()
+                    input('Enter to exit')
+                    exit()
  
     def show_weeks(self: DuolingoMarker) -> None:
         weeks = self.get_weeks()
@@ -181,6 +209,9 @@ class DuolingoMarker:
                     break
         
         print('\nFinished')
+    
+    def get_week_end_day(self: DuolingoMarker) -> int:
+        return ((self.week_start_day + 7) - 1) % 7
 
     def get_weeks(self: DuolingoMarker) -> list[tuple[datetime.date]]:
         if not self.dates:
@@ -192,18 +223,18 @@ class DuolingoMarker:
 
         for date in sorted(self.dates):
 
-            # Started week?
+            # Started week? (Any days up to first 'week end day' get included here)
             if start is None:
                 start = date
                 end = None
 
-            # Sunday?
-            if date.strftime('%w') == '0':
+            # Last day of week?
+            if date.strftime('%w') == str(self.get_week_end_day()):
                 end = date
                 weeks.append((start, end))
                 start = None
         
-        # Didn't end on a Sunday?
+        # Days remain after last 'week end day'? Create semi-week
         if end is None:
             end = date
             weeks.append((start, end))
@@ -216,6 +247,8 @@ class DuolingoMarker:
 
         boni = self.bonus_weeks.copy()
 
+        # Note that in the current implementation, the "bonus week date"
+        # can actually be any day within the target week, including start and end.
         for (start, end) in weeks:
             for bonus in boni:
                 if start <= bonus <= end:
@@ -238,13 +271,15 @@ class DuolingoMarker:
 
         s = f'Week {label}: {start.strftime(FMT_DATE_OUTPUT)} to {end.strftime(FMT_DATE_OUTPUT)}'
 
-        s += "\n\nName".ljust(22) + ' : ' + "XP   : Counted\n"
-        s += "=" * 37
+        len_name = len(max(self.students.values(), key=lambda s: len(s.name)).name)
+
+        s += "\n\nName".ljust(len_name + 2) + ' : ' + "XP   : Counted\n"
+        s += "=" * (len_name + 17)
 
         for stu in sorted(self.students.values(), key=lambda s: s.name):
             xp = stu.xp_between(start_dt, end_dt)
 
-            name = stu.name.title().ljust(20)
+            name = stu.name.title().ljust(len_name)
             full = str(xp).ljust(4)
             capt = str(min(self.goal, xp)).ljust(3)
 

@@ -1,11 +1,20 @@
-goal::100
+; weekly XP goal. Default = 250
+goal::250
 
-bonus weeks:2
-; Sundays of weeks that don't have required XP
-2024-02-04
-2024-03-17
+; Day that each week starts on (at midnight)
+; 0 = Sunday, 1 = Monday, etc.
+; Default = 0 (Sunday)
+week start day::0
 
-students::3
-a name that should stand as it is::
-a name that should be aliased::Alice
-a name that should be deleted::-
+; First days of weeks that don't have required XP. Default = no such weeks
+bonus week start::2026-03-14
+
+; Student names to recognize
+student::username1             ; username is used as the output
+student::username2==Doe, John  ; username is mapped to alias, which is used as the output
+student::username3==-          ; username is ignored in processing
+
+; Notes:
+; - The best strategy is probably to alias all to Last, First to match Edsby order.
+; - Multiple usernames can map to the same alias.
+; - Unrecognized usernames intentionally cause an error so as to alert you to potentially uncredited students.
