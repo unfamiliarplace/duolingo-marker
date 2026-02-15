@@ -7,6 +7,8 @@ goal::250
 week start day::0
 
 ; First days of weeks that don't have required XP. Default = no such weeks
+; Don't forget to include the first week of the semester to avoid it being treated as a 100% requirement week
+bonus week start::2026-01-31
 bonus week start::2026-03-14
 
 ; Student names to recognize
